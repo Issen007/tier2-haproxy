@@ -75,23 +75,40 @@ configure_haproxy() {
 
 }
 
-echo "HAProxy Hostname: $1";
-echo "Cloudian Base Url: $8";
-echo "Cluster Region Name: $9";
-echo "1st Cloudian Hostname: $2";
-echo "1st Cloudian Host IP: $3";
-echo "2nd Cloudian Hostname: $4";
-echo "2nd Cloudian Host IP: $5";
-echo "3rd Cloudian Hostname: $6";
-echo "3rd Cloudian Host IP: $7";
+show_config() {
+  echo "HAProxy Hostname: $1";
+  echo "Cloudian Base Url: $2";
+  echo "Cluster Region Name: $3";
+  echo "1st Cloudian Hostname: $4";
+  echo "1st Cloudian Host IP: $5";
+  echo "2nd Cloudian Hostname: $6";
+  echo "2nd Cloudian Host IP: $7";
+  echo "3rd Cloudian Hostname: $8";
+  echo "3rd Cloudian Host IP: $9";
+  pause
+}
+
+while getopts a:b:c:d:e:f:g:h:i flag
+do
+    case "${flag}" in
+        a) hostname=${OPTARG};;
+        b) clusterUrl=${OPTARG};;
+        c) clusterRegion=${OPTARG};;
+        d) nodeName1=${OPTARG};;
+        e) nodeIp1=${OPTARG};;
+        f) nodeName2=${OPTARG};;
+        g) nodeIp2=${OPTARG};;
+        h) nodeName3=${OPTARG};;
+        i) nodeIp3=${OPTARG};;
+    esac
+done
 
 create_user
 firewall_settings
 dependancies_install dnf
 download_config
-configure_haproxy $1 $2 $3 $4 $5 $6 $7 $8 $9
-
-
+show_config $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
+configure_haproxy $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
 
 # if [ -f $cristie_control_file ]; then
 #   ### Update of the system are done
