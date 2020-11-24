@@ -1,0 +1,13 @@
+[Unit]
+Description=Cristie HAProxy Install
+After=syslog.target network.target
+
+[Service]
+Type=notify
+#EnvironmentFile=/etc/sysconfig/haproxy-1.9.7
+ExecStart=/var/run/cristie/install.sh
+#ExecReload=/bin/kill -USR2 $MAINPID
+ExecStop=/bin/kill -USR1 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
