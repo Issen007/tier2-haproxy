@@ -1,0 +1,344 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: haproxy
+  annotations:
+    description: "haproxy Installation using Cloudian and Openshift 4.x"
+    tags: "fileshare,haproxy,s3,aws,cloudian"
+    iconClass: fa-cloud-upload
+    template.openshift.io/display-name: "haproxy MariaDB example using Cloudian Storage"
+    template.openshift.io/provider-display-name: "issen007"
+    template.openshift.io/documentation-url: "https://github.com/CristieNordic/haproxy-openshift/blob/master/README.md"
+    template.openshift.io/support-url: "https://github.com/tobru/haproxy-openshift/issues" ## Fix this
+
+parameters:
+- name: DOMAIN
+  description: Cloudian S3 Domain (emea.cristienordic.com)
+  required: true
+- name: REGION
+  description: Cloudian Cluster Region (sweden)
+  required: true
+- name: NODE1
+  description: Hostname of of 1st Cloudian Node
+  value: hyperstore-01
+- name: IP1
+  description: IP to 1st Cloudian Node
+  required: true
+- name: NODE2
+  description: Hostname of 2nd Cloudian Node
+  value: hyperstore-02
+- name: IP2
+  description: IP to 2nd Cloudian Node
+  required: true
+- name: NODE3
+  description: Hostname of 3rd Cloudian Node
+  value: hyperstore-03
+- name: IP3
+  description: IP to 3rd Cloudian Node
+  required: true
+- name: HAPROXY_IMAGE
+  description: HAProxy image to Deploy
+  value: docker.io/haproxy
+- name: HAPROXY_IMAGE_TAG
+  description: Tag of the HAProxy Docker Image to deploy
+  value: 2.3.1-alpine
+
+objects:
+### HAProxy CONFIGURATION ###
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: haproxy-config
+  data:
+    haproxy.cfg: |
+      global
+          log /dev/log local0
+          log /dev/log local1 notice
+          #chroot /var/lib/haproxy
+          #user haproxy
+          #group haproxy
+          spread-checks 5
+          tune.bufsize 32768
+          tune.maxrewrite 1024
+          maxconn 16384
+          daemon
+
+      defaults
+          log global
+          mode tcp
+          maxconn 8192
+          timeout connect 5s
+          timeout client 1m
+          timeout server 1m
+          timeout check 5s
+          balance leastconn
+
+      # admin stats on port 8080 listen stats
+      listen stats
+      	bind :8080
+      	mode http
+      	stats enable
+      	maxconn 128
+      	stats uri /
+      	stats realm Haproxy\ Statistics stats auth admin:public
+
+      # Cloudian CMC
+      listen cmc.${REGION}.${DOMAIN}
+      	bind :18888
+      	mode http
+      	http-request replace-value Host (.*):8888 \1:8443
+          	http-request redirect code 302 location https://%[hdr(host)]%[capture.req.uri]
+
+      listen https.cmc.${REGION}.${DOMAIN}
+      	bind :18443
+      	mode tcp
+      	stick-table type ip size 100k expire 30m
+      	stick on src
+      	http-check send uri /Cloudian/login.htm
+        option httpchk
+      	description Cloudian HyperStore CMC - HTTPS
+      	server ${NODE1} ${IP1}:8443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE2} ${IP2}:8443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE3} ${IP3}:8443 check check-ssl verify none inter 5s rise 1 fall 2
+
+
+      # Cloudian S3 services
+      listen s3-${REGION}.${REGION}.${DOMAIN}
+      	bind :18080
+      	mode tcp
+      	option tcp-check
+      	description Cloudian HyperStore S3
+      	server ${NODE1} ${IP1}:80 check inter 5s rise 1 fall 2
+      	server ${NODE2} ${IP2}:80 check inter 5s rise 1 fall 2
+      	server ${NODE3} ${IP3}:80 check inter 5s rise 1 fall 2
+
+      # Cloudian S3 services - HTTPS
+      listen https.s3-${REGION}.${REGION}.${DOMAIN}
+      	bind :18443
+      	mode tcp
+      	option ssl-hello-chk
+        option log-health-checks
+      	description Cloudian HyperStore S3 - HTTPS
+      	server ${NODE1} ${IP1}:443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE2} ${IP2}:443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE3} ${IP3}:443 check check-ssl verify none inter 5s rise 1 fall 2
+
+
+      # Cloudian Admin-API
+      listen s3-admin.${REGION}.${DOMAIN}
+      	bind :19443
+      	mode tcp
+      	option ssl-hello-chk
+        option log-health-checks
+      	description Cloudian HyperStore API
+      	server ${NODE1} ${IP1}:19443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE2} ${IP2}:19443 check check-ssl verify none inter 5s rise 1 fall 2
+      	server ${NODE3} ${IP3}:19443 check check-ssl verify none inter 5s rise 1 fall 2
+
+      # Cloudian IAM Services
+
+      # HTTP for IAM
+      listen iam.${REGION}.${DOMAIN}
+          bind :16080
+          mode tcp
+          description Cloudian HyperStore IAM - HTTP
+      	  server ${NODE1} ${IP1}:16080 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:16080 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:16080 check inter 5s rise 1 fall 2
+
+      # HTTPS for IAM
+      listen https.iam.${REGION}.${DOMAIN}
+          bind :16443
+          mode tcp
+          description Cloudian HyperStore IAM - HTTPS
+         	server ${NODE1} ${IP1}:16443 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:16443 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:16443 check inter 5s rise 1 fall 2
+
+
+### IMEAGE STREAM ###
+### haproxy Build ###
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: haproxy
+    labels:
+      app.kubernetes.io/name: haproxy
+      app.kubernetes.io/component: ImageStream-haproxy
+      app.kubernetes.io/part-of: cloudian
+  spec:
+    tags:
+    - annotations:
+        openshift.io/imported-from: ${HAPROXY_IMAGE}:${HAPROXY_IMAGE_TAG}
+      from:
+        kind: DockerImage
+        name: ${HAPROXY_IMAGE}:${HAPROXY_IMAGE_TAG}
+      importPolicy:
+        scheduled: true
+      name: ${HAPROXY_IMAGE_TAG}
+      referencePolicy:
+        type: Source
+
+### DEPLOYMENT ###
+### Deployment haproxy ###
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: haproxy
+    name: haproxy
+  spec:
+    replicas: 1
+    selector:
+      app: haproxy
+      deploymentconfig: haproxy
+    strategy:
+      activeDeadlineSeconds: 21600
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          app: haproxy
+          deploymentconfig: haproxy
+      spec:
+        containers:
+        ### haproxy Deployment ###
+        - name: haproxy
+          image: haproxy
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 9000
+            timeoutSeconds: 5
+          ports:
+          - name: http-cmc-port
+            containerPort: 18888 ## Port 8888
+            protocol: TCP
+          - name: https-cmc-port
+            containerPort: 18443 ## Port 8443
+            protocol: TCP
+          - name: http-s3-port
+            containerPort: 18080 ## Port 80
+            protocol: TCP
+          - name: https-s3-port
+            containerPort: 18443 ## Port 443
+            protocol: TCP
+          - name: s3-admin-port
+            containerPort: 19443 ## Port 19443
+            protocol: TCP
+          - name: iam-port
+            containerPort: 16080 ## Port 16080
+            protocol: TCP
+          - name: https-iam-port
+            containerPort: 16443 ## Port 16443
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 9000
+            timeoutSeconds: 5
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+            name: haproxy-config
+            subPath: haproxy.cfg
+
+        ### Pod Policy ###
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+
+        ### Create Volumes ###
+        volumes:
+        - name: haproxy-config
+          configMap:
+            name: haproxy-config
+    test: false
+
+    ### Trigger Policy ###
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - haproxy
+        from:
+          kind: ImageStreamTag
+          name: haproxy:${HAPROXY_IMAGE_TAG}
+      type: ImageChange
+
+### Services ###
+### Nginx Service ###
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: haproxy
+    name: haproxy
+  spec:
+    ports:
+    - name: http-cmc-port
+      targetPort: 18888
+      port: 8888
+      protocol: TCP
+    - name: https-cmc-port
+      targetPort: 18443
+      port: 8443
+      protocol: TCP
+    - name: http-s3-port
+      targetPort: 18080
+      port: 80
+      protocol: TCP
+    - name: https-s3-port
+      targetPort: 18443
+      port: 443
+      protocol: TCP
+    - name: s3-admin-port
+      targetPort: 19443
+      port: 19443
+      protocol: TCP
+    - name: iam-port
+      targetPort: 16080
+      port: 16080
+      protocol: TCP
+    - name: https-iam-port
+      targetPort: 16443
+      port: 16443
+      protocol: TCP
+    selector:
+      app: haproxy
+      deploymentconfig: haproxy
+    sessionAffinity: None
+    type: ClusterIP
+
+### Expose App to the World ###
+# - apiVersion: v1
+#   kind: Route
+#   metadata:
+#     name: haproxy
+#     annotations:
+#       template.openshift.io/expose-uri: "{.spec.host}"
+#   spec:
+#     host: ${haproxy_HOST}
+#     port:
+#       targetPort: 80-tcp
+#     to:
+#       kind: Service
+#       name: haproxy
+#       weight: 100
+#     wildcardPolicy: None

@@ -1,24 +1,5 @@
 #!/usr/bin/env bash
 
-cristie_control_file="/var/run/cristie-reboot"
-cristie_service="cristie-haproxy-install"
-
-continue_after_reboot() {
-  ### Running commands before reboot
-  echo "Create function to continue after reboot"
-  touch $cristie_control_file
-  #systemctl $cristie_service enable
-  sudo reboot
-}
-
-stop_after_reboot() {
-  ### Continue after reboot
-  echo "Working with last step and will not continue after reboot"
-  rm $cristie_control_file
-  #systemctl $cristie_service disable
-  #systemctl $cristie_service remove
-}
-
 update_system() {
   echo "Updating your system with $1"
   $1 $2 -y
@@ -50,12 +31,6 @@ dependancies_install() {
   $1 install -y open-vm-tools haproxy
 }
 
-download_config() {
-  ### Download Standard Config
-  echo "Download configuration"
-  wget http://deploy1.cristie.se/cloudian/haproxy.cfg
-}
-
 configure_haproxy() {
   ### Configured your hosts
   echo "Start Configure your system"
@@ -85,7 +60,8 @@ show_config() {
   echo "2nd Cloudian Host IP: $7";
   echo "3rd Cloudian Hostname: $8";
   echo "3rd Cloudian Host IP: $9";
-  pause
+  echo Pause for 30 seconds please wait...
+  sleep 30
 }
 
 while getopts a:b:c:d:e:f:g:h:i flag
@@ -103,21 +79,18 @@ do
     esac
 done
 
+
+FILE=/bin/dnf
+if [ -f "$FILE" ]; then
+  installer=dnf
+else
+  installer=yum
+fi
+
 create_user
 firewall_settings
-dependancies_install dnf
-download_config
+dependancies_install $installer
 show_config $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
 configure_haproxy $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
-
-# if [ -f $cristie_control_file ]; then
-#   ### Update of the system are done
-#   stop_after_reboot
-#   create_user
-#   firewall_settings
-#   dependancies_install dnf
-#
-# else
-#   ### Update your system
-#   update_system dnf update
-#   continue_after_reboot
+update_system $installer update
+#reboot
