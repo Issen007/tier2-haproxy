@@ -5,6 +5,7 @@ cristie_service="cristie-haproxy-install"
 
 continue_after_reboot() {
   ### Running commands before reboot
+  echo "Create function to continue after reboot"
   touch $cristie_control_file
   #systemctl $cristie_service enable
   sudo reboot
@@ -12,18 +13,21 @@ continue_after_reboot() {
 
 stop_after_reboot() {
   ### Continue after reboot
+  echo "Working with last step and will not continue after reboot"
   rm $cristie_control_file
   #systemctl $cristie_service disable
   #systemctl $cristie_service remove
 }
 
 update_system() {
+  echo "Updating your system with $1"
   $1 $2 -y
   echo $?
 }
 
 firewall_settings() {
   ### Setup all Firewall roles for Cloudian
+  echo "Fix all Firewall Rules for Cloudian"
   sudo firewall-cmd --add-port=8443/tcp --permanent
   sudo firewall-cmd --add-port=8888/tcp --permanent
   sudo firewall-cmd --add-service=http --permanent
@@ -35,29 +39,37 @@ firewall_settings() {
 
 create_user () {
   ### Create HAProxy User
+  echo "Create User"
   groupadd -g 188 haproxy
   useradd -g 188 -u 188 -d /var/lib/haproxy -s /sbin/nologin -c haproxy haproxy
 }
 
 dependancies_install() {
   ### Install all your dependancies and necessary software
+  echo "Installing HAProxy and VMware Tools using $1"
   $1 install -y open-vm-tools haproxy
 }
 
 download_config() {
   ### Download Standard Config
+  echo "Download configuration"
   wget http://deploy1.cristie.se/cloudian/haproxy.cfg
 }
 
 configure_haproxy() {
   ### Configured your hosts
+  echo "Start Configure your system"
+  echo "Set hostname $1"
   echo -n $1 > /etc/hostname
+  echo "Fix IP and Hostname"
   sed -i "s/hyperstore-01/$2/g" haproxy.cfg
   sed -i "s/10.10.2.22/$3/g" haproxy.cfg
   sed -i "s/hyperstore-02/$4/g" haproxy.cfg
   sed -i "s/10.10.2.23/$5/g" haproxy.cfg
   sed -i "s/hyperstore-03/$6/g" haproxy.cfg
   sed -i "s/10.10.2.24/$7/g" haproxy.cfg
+
+  echo "Fixing Domain $8 and Region $9"
   sed -i "s/emea.demo.cloudian.com/$8/g" haproxy.cfg
   sed -i "s/s3-emea/$9/g" haproxy.cfg
 
