@@ -14,7 +14,14 @@ You have a kickstart script included in this package that install Fedora Server 
 If you want to use Redhat Enterprise Linux, CentOS or Fedora manually, please install the latest version.
 
 ### Run the configuration
-sudo ./update.sh -a haproxy01 -b emea.company.com -c s3-emea -d node1 -e 1.1.1.1 -f node2 -g 2.2.2.2 -h node3 -i 3.3.3.3
+To run the configuration copy and paste this line with your values.
+
+`sudo ./install.sh -a haproxy01 -b emea.company.com -c s3-emea -d node1 -e 1.1.1.1 -f node2 -g 2.2.2.2 -h node3 -i 3.3.3.3`
+
+### Run HAProxy 2.3.1
+HAProxy 2.x is not included in Fedora 33 or any CentOS release so far. There for have I create this extra installer that installing HAProxy from source code.
+
+`sudo ./install-2.3.1.sh -a haproxy01 -b emea.company.com -c s3-emea -d node1 -e 1.1.1.1 -f node2 -g 2.2.2.2 -h node3 -i 3.3.3.3`
 
 ## Kubernetes Openshift
 Create a new project on your OpenShift Cluster.

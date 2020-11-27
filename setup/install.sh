@@ -27,15 +27,8 @@ create_user () {
 
 dependancies_install() {
   ### Install all your dependancies and necessary software
-  echo "Download and installing HAProxy"
-  sudo dnf install make gcc kernel-devel -y
-  wget http://www.haproxy.org/download/2.3/src/haproxy-2.3.1.tar.gz
-  tar zxvf haproxy-2.3.1.tar.gz
-  cd haproxy-2.3.1
-  make clean
-  make -j $(nproc) TARGET=linux-glibc
-  make install
-
+  echo "Installing HAProxy and VMware Tools using $1"
+  $1 install -y open-vm-tools haproxy
 }
 
 configure_haproxy() {
@@ -44,16 +37,16 @@ configure_haproxy() {
   echo "Set hostname $1"
   echo -n $1 > /etc/hostname
   echo "Fix IP and Hostname"
-  sed -i "s/hyperstore-01/$2/g" haproxy.cfg
-  sed -i "s/10.10.2.22/$3/g" haproxy.cfg
-  sed -i "s/hyperstore-02/$4/g" haproxy.cfg
-  sed -i "s/10.10.2.23/$5/g" haproxy.cfg
-  sed -i "s/hyperstore-03/$6/g" haproxy.cfg
-  sed -i "s/10.10.2.24/$7/g" haproxy.cfg
+  sed -i "s/hyperstore-01/$4/g" haproxy.cfg
+  sed -i "s/10.10.2.22/$5/g" haproxy.cfg
+  sed -i "s/hyperstore-02/$6/g" haproxy.cfg
+  sed -i "s/10.10.2.23/$7/g" haproxy.cfg
+  sed -i "s/hyperstore-03/$8/g" haproxy.cfg
+  sed -i "s/10.10.2.24/$9/g" haproxy.cfg
 
-  echo "Fixing Domain $8 and Region $9"
-  sed -i "s/emea.demo.cloudian.com/$8/g" haproxy.cfg
-  sed -i "s/s3-emea/$9/g" haproxy.cfg
+  echo "Fixing Domain $2 and Region $3"
+  sed -i "s/emea.demo.cloudian.com/$2/g" haproxy.cfg
+  sed -i "s/s3-emea/$3/g" haproxy.cfg
   sleep 10
 }
 
@@ -96,8 +89,8 @@ fi
 
 create_user
 firewall_settings
-dependancies_install
+dependancies_install $installer
 show_config $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
-configure_haproxy $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3
-#update_system $installer update
+configure_haproxy $hostname $clusterUrl $clusterRegion $nodeName1 $nodeIp1 $nodeName2 $nodeIp2 $nodeName3 $nodeIp3 
+update_system $installer update
 #reboot

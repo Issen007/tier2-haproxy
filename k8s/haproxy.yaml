@@ -41,7 +41,7 @@ parameters:
   value: docker.io/haproxy
 - name: HAPROXY_IMAGE_TAG
   description: Tag of the HAProxy Docker Image to deploy
-  value: 2.3.1-alpine
+  value: latest
 
 objects:
 ### HAProxy CONFIGURATION ###
@@ -61,7 +61,7 @@ objects:
           tune.bufsize 32768
           tune.maxrewrite 1024
           maxconn 16384
-          daemon
+          #daemon
 
       defaults
           log global
@@ -75,86 +75,78 @@ objects:
 
       # admin stats on port 8080 listen stats
       listen stats
-      	bind :8080
-      	mode http
-      	stats enable
-      	maxconn 128
-      	stats uri /
-      	stats realm Haproxy\ Statistics stats auth admin:public
+          bind :18080
+          mode http
+          stats enable
+          maxconn 128
+          stats uri /
+          stats realm Haproxy\ Statistics stats auth admin:public
 
       # Cloudian CMC
-      listen cmc.${REGION}.${DOMAIN}
-      	bind :18888
-      	mode http
-      	http-request replace-value Host (.*):8888 \1:8443
-          	http-request redirect code 302 location https://%[hdr(host)]%[capture.req.uri]
+      listen cmc.cristie.se
+          bind :18888
+          mode http
+          http-request replace-value Host (.*):8888 \1:8443
+          http-request redirect code 302 location https://%[hdr(host)]%[capture.req.uri]
 
-      listen https.cmc.${REGION}.${DOMAIN}
-      	bind :18443
-      	mode tcp
-      	stick-table type ip size 100k expire 30m
-      	stick on src
-      	http-check send uri /Cloudian/login.htm
-        option httpchk
-      	description Cloudian HyperStore CMC - HTTPS
-      	server ${NODE1} ${IP1}:8443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE2} ${IP2}:8443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE3} ${IP3}:8443 check check-ssl verify none inter 5s rise 1 fall 2
-
+      listen https.cmc.cristie.se
+          bind :18443
+          mode tcp
+          stick-table type ip size 100k expire 30m
+          stick on src
+          option httpchk OPTIONS /Cloudian/login.htm
+          description Cloudian HyperStore CMC - HTTPS
+          server ${NODE1} ${IP1}:8443 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:8443 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:8443 check inter 5s rise 1 fall 2
 
       # Cloudian S3 services
-      listen s3-${REGION}.${REGION}.${DOMAIN}
-      	bind :18080
-      	mode tcp
-      	option tcp-check
-      	description Cloudian HyperStore S3
-      	server ${NODE1} ${IP1}:80 check inter 5s rise 1 fall 2
-      	server ${NODE2} ${IP2}:80 check inter 5s rise 1 fall 2
-      	server ${NODE3} ${IP3}:80 check inter 5s rise 1 fall 2
+      listen s3-sthlm.cristie.se
+          bind :18080
+          mode tcp
+          option httpchk HEAD /.healthCheck
+          description Cloudian HyperStore S3
+          server ${NODE1} ${IP1}:80 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:80 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:80 check inter 5s rise 1 fall 2
 
       # Cloudian S3 services - HTTPS
-      listen https.s3-${REGION}.${REGION}.${DOMAIN}
-      	bind :18443
-      	mode tcp
-      	option ssl-hello-chk
-        option log-health-checks
-      	description Cloudian HyperStore S3 - HTTPS
-      	server ${NODE1} ${IP1}:443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE2} ${IP2}:443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE3} ${IP3}:443 check check-ssl verify none inter 5s rise 1 fall 2
-
+      listen https.s3-sthlm.cristie.se
+          bind :18443
+          mode tcp
+          option httpchk HEAD /.healthCheck
+          description Cloudian HyperStore S3 - HTTPS
+          server ${NODE1} ${IP1}:443 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:443 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:443 check inter 5s rise 1 fall 2
 
       # Cloudian Admin-API
-      listen s3-admin.${REGION}.${DOMAIN}
-      	bind :19443
-      	mode tcp
-      	option ssl-hello-chk
-        option log-health-checks
-      	description Cloudian HyperStore API
-      	server ${NODE1} ${IP1}:19443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE2} ${IP2}:19443 check check-ssl verify none inter 5s rise 1 fall 2
-      	server ${NODE3} ${IP3}:19443 check check-ssl verify none inter 5s rise 1 fall 2
+      listen s3-admin.cristie.se
+          bind :19443
+          mode tcp
+          description Cloudian HyperStore API
+          server ${NODE1} ${IP1}:19443 check inter 5s rise 1 fall 2
+          server ${NODE2} ${IP2}:19443 check inter 5s rise 1 fall 2
+          server ${NODE3} ${IP3}:19443 check inter 5s rise 1 fall 2
 
       # Cloudian IAM Services
-
       # HTTP for IAM
-      listen iam.${REGION}.${DOMAIN}
+      listen iam.cristie.se
           bind :16080
           mode tcp
           description Cloudian HyperStore IAM - HTTP
-      	  server ${NODE1} ${IP1}:16080 check inter 5s rise 1 fall 2
+          server ${NODE1} ${IP1}:16080 check inter 5s rise 1 fall 2
           server ${NODE2} ${IP2}:16080 check inter 5s rise 1 fall 2
           server ${NODE3} ${IP3}:16080 check inter 5s rise 1 fall 2
 
       # HTTPS for IAM
-      listen https.iam.${REGION}.${DOMAIN}
+      listen https.iam.cristie.se
           bind :16443
           mode tcp
           description Cloudian HyperStore IAM - HTTPS
-         	server ${NODE1} ${IP1}:16443 check inter 5s rise 1 fall 2
+          server ${NODE1} ${IP1}:16443 check inter 5s rise 1 fall 2
           server ${NODE2} ${IP2}:16443 check inter 5s rise 1 fall 2
           server ${NODE3} ${IP3}:16443 check inter 5s rise 1 fall 2
-
 
 ### IMEAGE STREAM ###
 ### haproxy Build ###
@@ -222,6 +214,9 @@ objects:
               port: 9000
             timeoutSeconds: 5
           ports:
+          - name: stats-port
+            containerPort: 18080 ## Port 8080
+            protocol: TCP
           - name: http-cmc-port
             containerPort: 18888 ## Port 8888
             protocol: TCP
@@ -283,7 +278,7 @@ objects:
       type: ImageChange
 
 ### Services ###
-### Nginx Service ###
+### HAProxy Service ###
 - apiVersion: v1
   kind: Service
   metadata:
@@ -292,6 +287,10 @@ objects:
     name: haproxy
   spec:
     ports:
+    - name: stats-port
+      targetPort: 18080
+      port: 8080
+      protocol: TCP
     - name: http-cmc-port
       targetPort: 18888
       port: 8888
